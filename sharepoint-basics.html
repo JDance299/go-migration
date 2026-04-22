@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SharePoint Basics</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700&display=swap');
+  :root {
+    --ms-blue:#0078d4;--ms-blue-dark:#005a9e;--ms-blue-light:#deecf9;
+    --ms-green:#107c10;--ms-gray:#f3f2f1;--ms-gray-mid:#edebe9;
+    --ms-text:#323130;--ms-text-light:#605e5c;--ms-border:#d2d0ce;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:#1a1a2e;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+  .wrapper{width:100%;max-width:860px}
+  h1.title{font-family:'Nunito',sans-serif;color:#fff;font-size:1.1rem;font-weight:300;letter-spacing:3px;text-transform:uppercase;text-align:center;margin-bottom:18px;opacity:.7}
+  .progress-track{display:flex;gap:8px;margin-bottom:16px;justify-content:center}
+  .progress-dot{width:28px;height:4px;border-radius:2px;background:rgba(255,255,255,.15);transition:background .4s;cursor:pointer}
+  .progress-dot.active{background:var(--ms-blue)}.progress-dot.done{background:rgba(255,255,255,.4)}
+    .screen-container{background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.5);position:relative}
+  .sp-topbar{background:#fff;height:38px;display:flex;align-items:center;padding:0 12px;gap:8px;border-bottom:1px solid #e1dfdd;flex-shrink:0}
+  .sp-m365{font-size:.8rem;font-weight:700;color:#0078d4;letter-spacing:-.2px;white-space:nowrap}
+  .sp-topbar-search{flex:1;max-width:260px;margin:0 8px;background:#f3f2f1;border:1px solid #e1dfdd;border-radius:4px;height:24px;display:flex;align-items:center;padding:0 8px;gap:6px;font-size:.7rem;color:#605e5c}
+  .sp-topbar-right{margin-left:auto;display:flex;align-items:center;gap:6px}
+  .sp-avatar{width:26px;height:26px;border-radius:50%;background:#0078d4;color:white;font-size:.6rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .sp-group-bar{background:#fff;padding:7px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #e1dfdd}
+  .sp-group-icon{width:34px;height:34px;background:#038387;border-radius:4px;display:flex;align-items:center;justify-content:center;color:white;font-size:.68rem;font-weight:700;flex-shrink:0}
+  .sp-group-name{font-size:.88rem;font-weight:700;color:#323130}
+  .sp-group-meta{font-size:.68rem;color:#605e5c;margin-left:auto}
+  .sp-breadcrumb-bar{padding:5px 16px 4px;display:flex;align-items:center;justify-content:space-between;background:#fff;gap:12px}
+  .sp-breadcrumb{font-size:.76rem;color:#605e5c;display:flex;align-items:center;gap:3px;flex:1;white-space:nowrap;overflow:hidden;transition:opacity .3s}
+  .sp-breadcrumb .crumb{color:#0078d4;cursor:pointer}
+  .sp-breadcrumb .crumb.active{color:#323130;font-weight:600;cursor:default}
+  .sp-breadcrumb .sep{color:#a19f9d;font-size:.68rem}
+  .sp-create-btn{background:#0078d4;color:white;border:none;border-radius:3px;padding:5px 12px;font-size:.76rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;flex-shrink:0}
+  .sp-cmd-bar{background:#fff;padding:3px 16px 5px;display:flex;align-items:center;gap:2px;border-bottom:1px solid #e1dfdd}
+  .sp-btn{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border:1px solid transparent;border-radius:3px;font-size:.74rem;cursor:pointer;background:transparent;color:#323130;white-space:nowrap;transition:all .15s}
+  .sp-btn.active-btn{background:#edebe9;border-color:#d2d0ce}
+  .sp-divider{width:1px;height:18px;background:#e1dfdd;margin:0 4px}
+  .sp-list-header{display:grid;grid-template-columns:28px 1fr 110px 110px;padding:6px 16px;border-bottom:1px solid #e1dfdd;font-size:.7rem;color:#605e5c;font-weight:600;background:#faf9f8}
+  .sp-file-row{display:grid;grid-template-columns:28px 1fr 110px 110px;padding:7px 16px;border-bottom:1px solid #f3f2f1;align-items:center;font-size:.8rem;cursor:pointer;transition:background .15s}
+  .sp-file-row.selected{background:#deecf9}
+  .file-icon{font-size:1rem}.file-name{color:#0078d4}.file-modified{color:#605e5c;font-size:.72rem}.file-size{color:#605e5c;font-size:.72rem}
+
+  .stage{display:none;position:relative;overflow:hidden;background:#fff}
+  .stage.active{display:block}
+
+  .sp-bg-filelist{position:absolute;inset:0;pointer-events:none;opacity:1}
+  .sp-bg-filelist.faded{opacity:.9}
+  /* Invisible height driver — matches file/folder row count exactly */
+  .stage-sizer{visibility:hidden;pointer-events:none}
+
+  .anim-glass{position:absolute;inset:0;background:rgba(255,255,255,.52);z-index:2;pointer-events:none;transition:opacity .3s}
+  .anim-layer{position:absolute;inset:0;z-index:3;pointer-events:none}
+
+  /* Folder open slide-in */
+  .folder-open-overlay{position:absolute;inset:0;background:#fff;z-index:8;display:none}
+  .folder-open-overlay.slide-in{display:block}
+
+  /* Dropdowns */
+  .sp-dropdown{position:absolute;background:white;border:1px solid var(--ms-border);border-radius:4px;box-shadow:0 4px 20px rgba(0,0,0,.15);min-width:200px;z-index:20;opacity:0;transform:scale(.95) translateY(-4px);transition:opacity .2s,transform .2s;font-size:.8rem;overflow:hidden}
+  .sp-dropdown.show{opacity:1;transform:scale(1) translateY(0)}
+  .dd-item{padding:8px 14px;cursor:pointer;color:var(--ms-text);display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--ms-gray-mid);transition:background .1s}
+  .dd-item:last-child{border-bottom:none}
+  .dd-item.hovered{background:var(--ms-blue-light);color:var(--ms-blue)}
+  .dd-item.highlighted{background:var(--ms-blue);color:white}
+
+  .ctx-menu{position:absolute;background:white;border:1px solid var(--ms-border);border-radius:4px;box-shadow:0 4px 20px rgba(0,0,0,.15);min-width:160px;z-index:20;opacity:0;transform:scale(.95);transform-origin:top left;transition:opacity .2s,transform .2s;font-size:.8rem;overflow:hidden}
+  .ctx-menu.show{opacity:1;transform:scale(1)}
+
+  .move-dialog{position:absolute;background:white;border:1px solid var(--ms-border);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.2);width:270px;z-index:25;opacity:0;transition:opacity .3s,transform .3s;overflow:hidden;top:20px;left:50%;transform:translateX(-50%) translateY(10px)}
+  .move-dialog.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .move-dialog-header{background:var(--ms-blue);color:white;padding:10px 14px;font-size:.82rem;font-weight:700}
+  .move-folder-row{padding:7px 14px;display:flex;align-items:center;gap:8px;font-size:.78rem;cursor:pointer;border-bottom:1px solid var(--ms-gray-mid);transition:background .1s}
+  .move-folder-row:last-child{border-bottom:none}
+  .move-folder-row.hovered{background:var(--ms-blue-light);color:var(--ms-blue)}
+  .move-dialog-footer{padding:8px 14px;background:var(--ms-gray);display:flex;justify-content:flex-end;gap:8px}
+  .move-btn{padding:5px 14px;border-radius:3px;font-size:.75rem;cursor:pointer;font-weight:600;border:1px solid var(--ms-border);background:#fff}
+  .move-btn.primary{background:var(--ms-blue);color:white;border-color:var(--ms-blue)}
+
+  .rename-input-wrap{position:absolute;z-index:22;background:white;border:2px solid var(--ms-blue);border-radius:3px;padding:3px 8px;display:flex;align-items:center;gap:4px;opacity:0;transition:opacity .3s;box-shadow:0 2px 8px rgba(0,120,212,.25)}
+  .rename-input-wrap.show{opacity:1}
+  .rename-input-wrap input{border:none;outline:none;font-size:.82rem;font-family:inherit;color:var(--ms-text);width:210px;background:transparent}
+  .cursor-blink{display:inline-block;width:2px;height:14px;background:var(--ms-text);animation:blink .8s step-end infinite;vertical-align:middle;flex-shrink:0}
+
+  .hl-ring{position:absolute;border:2px solid #ffcc00;background:rgba(255,204,0,.18);border-radius:4px;pointer-events:none;opacity:0;transition:opacity .3s;z-index:15}
+  .hl-ring.show{opacity:1}
+
+  /* Animated cursor */
+  .sim-cursor{position:absolute;width:18px;height:18px;pointer-events:none;z-index:40;opacity:0;transition:opacity .2s,left .4s cubic-bezier(.4,0,.2,1),top .4s cubic-bezier(.4,0,.2,1)}
+  .sim-cursor.show{opacity:1}
+  .sim-cursor svg{filter:drop-shadow(1px 2px 3px rgba(0,0,0,.4))}
+
+  .callout{position:absolute;background:#1e3a5f;color:white;border:2px solid var(--ms-blue);border-radius:6px;padding:7px 11px;font-size:.72rem;font-family:'Nunito',sans-serif;font-weight:600;max-width:220px;line-height:1.4;pointer-events:none;opacity:0;transform:translateY(5px);transition:opacity .35s,transform .35s;z-index:30;box-shadow:0 6px 20px rgba(0,0,0,.35)}
+  .callout.show{opacity:1;transform:translateY(0)}
+  .callout.arrow-up::before{content:'';position:absolute;border:6px solid transparent;border-bottom-color:var(--ms-blue);top:-13px;left:14px}
+  .callout.arrow-down::before{content:'';position:absolute;border:6px solid transparent;border-top-color:var(--ms-blue);bottom:-13px;left:14px}
+
+  /* Word Online chrome — matches real SP5 screenshot */
+  .word-doc-wrap{position:absolute;inset:0;display:flex;flex-direction:column;background:#f3f2f1;z-index:1;transition:opacity .4s}
+  .word-topbar{background:#fff;height:34px;display:flex;align-items:center;padding:0 10px;gap:8px;border-bottom:1px solid #e1dfdd;flex-shrink:0}
+  .word-w-icon{width:22px;height:22px;background:#2b579a;border-radius:2px;display:flex;align-items:center;justify-content:center;color:white;font-size:.68rem;font-weight:700;flex-shrink:0}
+  .word-filename{font-size:.8rem;font-weight:600;color:#323130;flex:1}
+  .word-autosave{font-size:.63rem;color:#107c10;display:flex;align-items:center;gap:3px}
+  .word-topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .word-share-btn{background:#0078d4;color:white;border:none;border-radius:3px;padding:3px 10px;font-size:.68rem;font-weight:600;cursor:pointer}
+  .word-ribbon{background:#fff;border-bottom:1px solid #e1dfdd;display:flex;align-items:center;padding:0 8px;gap:2px;flex-shrink:0;height:28px}
+  .word-tab{font-size:.72rem;color:#323130;padding:3px 8px;border-radius:3px;cursor:pointer}
+  .word-tab.active{color:#2b579a;font-weight:700;border-bottom:2px solid #2b579a}
+  .word-title-bar{display:none}
+  .word-ribbon-tab{display:none}
+  .word-doc-scroll{flex:1;overflow:hidden;display:flex;justify-content:center;align-items:flex-start;padding:14px 20px;background:#f3f2f1}
+  .word-page{background:white;width:100%;max-width:480px;box-shadow:0 1px 4px rgba(0,0,0,.12);padding:32px 40px;font-size:.78rem;line-height:1.8;color:#222}
+  .word-page h2{font-size:.9rem;font-weight:700;margin-bottom:10px;color:#111}
+  .word-page p{margin-bottom:9px;color:#333}
+
+  .tip-box{display:flex;align-items:flex-start;gap:8px;margin-top:8px;background:rgba(255,204,0,.12);border:1px solid rgba(255,204,0,.35);border-radius:5px;padding:7px 10px;font-size:.78rem;color:#ffe680;line-height:1.5}
+  .tip-icon{font-size:.9rem;flex-shrink:0;margin-top:1px}
+
+  .narration{background:linear-gradient(135deg,#0f1b35,#1a2a4a);border-top:3px solid var(--ms-blue);padding:16px 20px;display:flex;align-items:flex-start;gap:14px}
+  .narration-icon{width:36px;height:36px;background:var(--ms-blue);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;margin-top:2px}
+  .narration-text{color:#fff;flex:1}
+  .narration-heading{font-family:'Nunito',sans-serif;font-size:.95rem;font-weight:700;color:#93c5fd;margin-bottom:4px}
+  .narration-body{font-size:.82rem;color:rgba(255,255,255,.85);line-height:1.6}
+  .nav-row{display:flex;justify-content:space-between;align-items:center;margin-top:14px}
+  .nav-btn{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:white;padding:8px 20px;border-radius:5px;font-size:.82rem;cursor:pointer;font-family:'Nunito',sans-serif;font-weight:600;transition:all .2s}
+  .nav-btn:hover{background:rgba(255,255,255,.15)}.nav-btn:disabled{opacity:.3;cursor:default;pointer-events:none}
+  .nav-btn.primary-nav{background:var(--ms-blue);border-color:var(--ms-blue)}
+  .slide-counter{color:rgba(255,255,255,.4);font-size:.75rem;font-family:'Nunito',sans-serif}
+
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+  @media(max-width:600px){
+    body{padding:12px}
+    h1.title{font-size:.75rem;letter-spacing:2px;margin-bottom:12px}
+    .sp-breadcrumb{display:none}
+    .sp-toolbar{padding:5px 10px;overflow:hidden}
+    .sp-btn{font-size:.72rem;padding:4px 8px}
+    .sp-list-header{grid-template-columns:28px 1fr;padding:6px 10px}
+    .sp-list-header div:nth-child(3),.sp-list-header div:nth-child(4){display:none}
+    .sp-file-row{grid-template-columns:28px 1fr;padding:6px 10px;font-size:.78rem}
+    .file-modified,.file-size{display:none}
+    .stage{min-height:240px}
+    .narration{padding:12px 14px;gap:10px}
+    .narration-icon{width:30px;height:30px;font-size:.85rem}
+    .narration-heading{font-size:.85rem}
+    .narration-body{font-size:.75rem}
+    .nav-btn{padding:7px 14px;font-size:.75rem}
+    .move-dialog{width:230px}
+    .word-doc-scroll{padding:10px}
+    .word-page{padding:18px 20px;font-size:.72rem}
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <h1 class="title">SharePoint Basics</h1>
+  <div class="progress-track" id="progressTrack"></div>
+  <div class="screen-container">
+
+    <!-- Microsoft 365 top bar -->
+    <div class="sp-topbar">
+      <span class="sp-m365">Microsoft 365</span>
+      <div class="sp-topbar-search">🔍 Search this library</div>
+      <div class="sp-topbar-right"><div class="sp-avatar">JD</div></div>
+    </div>
+    <!-- Group bar -->
+    <div class="sp-group-bar">
+      <div class="sp-group-icon">GI</div>
+      <span class="sp-group-name">Garden Organic (ITWG)</span>
+      <span class="sp-group-meta">Private group · 10 members</span>
+    </div>
+    <!-- Breadcrumb + Create or upload -->
+    <div class="sp-breadcrumb-bar">
+      <div class="sp-breadcrumb" id="spBreadcrumb">
+        <span class="crumb">Documents</span><span class="sep"> › </span><span class="crumb">Server Migration</span><span class="sep"> › </span><span class="crumb active" id="spActiveCrumb">Garden Organic All</span>
+      </div>
+      <button class="sp-create-btn" id="btnCreate">＋ Create or upload</button>
+    </div>
+    <!-- Command bar -->
+    <div class="sp-cmd-bar">
+      <button class="sp-btn" id="btnUpload">📋 All Documents</button>
+      <div class="sp-divider"></div>
+      <button class="sp-btn" id="btnMove">→ Move to</button>
+      <button class="sp-btn" id="btnRename">✏ Rename</button>
+      <button class="sp-btn" id="btnDelete">🗑 Delete</button>
+    </div>
+
+    <!-- ══ SLIDE 1: Creating files ══ -->
+    <div class="stage" id="stage1">
+      <!-- Height driver — sized to subfolder list (5 rows) -->
+      <div class="stage-sizer">
+        <div class="sp-list-header"><div></div><div>Name</div><div>Modified</div><div>Modified By</div></div>
+        <div class="sp-file-row"><div class="file-icon">📁</div><div class="file-name">Accounts</div><div class="file-modified">Yesterday</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📁</div><div class="file-name">Associates</div><div class="file-modified">2 days ago</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📁</div><div class="file-name">Communications and marketing</div><div class="file-modified">Today</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📁</div><div class="file-name">CRM</div><div class="file-modified">3 days ago</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📁</div><div class="file-name">Education</div><div class="file-modified">4 days ago</div><div class="file-modified">Julia Dance</div></div>
+      </div>
+      <!-- Top-level folder list — fully visible, no opacity reduction -->
+      <div class="sp-bg-filelist" id="s1bg">
+        <div class="sp-list-header"><div></div><div>Name</div><div>Modified</div><div>Modified By</div></div>
+        <div class="sp-file-row"><div class="file-icon">📁</div><div class="file-name">Accounts</div><div class="file-modified">Yesterday</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📁</div><div class="file-name">Associates</div><div class="file-modified">2 days ago</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row" id="s1-cmrow"><div class="file-icon">📁</div><div class="file-name">Communications and marketing</div><div class="file-modified">Today</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📁</div><div class="file-name">CRM</div><div class="file-modified">3 days ago</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📁</div><div class="file-name">Education</div><div class="file-modified">4 days ago</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📁</div><div class="file-name">Customer services</div><div class="file-modified">5 Jan</div><div class="file-modified">Julia Dance</div></div>
+      </div>
+
+      <!-- Subfolder overlay slides in from right on folder click -->
+      <div class="folder-open-overlay" id="s1-subfolder">
+        <div class="sp-list-header"><div></div><div>Name</div><div>Modified</div><div>Modified By</div></div>
+        <div class="sp-file-row"><div class="file-icon">📁</div><div class="file-name">Adopt a veg</div><div class="file-modified">Yesterday</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📁</div><div class="file-name">Advertising</div><div class="file-modified">2 days ago</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📁</div><div class="file-name">Blogs</div><div class="file-modified">Today</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📁</div><div class="file-name">Booklets</div><div class="file-modified">3 days ago</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📁</div><div class="file-name">Brands</div><div class="file-modified">Last week</div><div class="file-modified">Julia Dance</div></div>
+      </div>
+
+      <!-- Glass overlay (hidden until after folder opens) -->
+      <div class="anim-glass" id="s1-glass" style="opacity:0"></div>
+
+      <!-- Animation layer -->
+      <div class="anim-layer" id="anim1">
+        <div class="sp-dropdown" id="s1dropdown" style="left:16px;top:8px;">
+          <div class="dd-item" id="s1word">📄 Word document</div>
+          <div class="dd-item">📊 Excel workbook</div>
+          <div class="dd-item">📋 PowerPoint presentation</div>
+          <div class="dd-item">📝 OneNote notebook</div>
+          <div class="dd-item">📁 Folder</div>
+        </div>
+        <div class="hl-ring" id="s1hl"></div>
+        <div class="callout arrow-up" id="s1callout" style="left:16px;top:190px;">Navigate to the right folder first, then click Create</div>
+      </div>
+      <!-- Simulated cursor — lives at screen-container level so it can reach the chrome above -->
+    </div><!-- end stage1 -->
+    <div class="sim-cursor" id="s1cursor" style="position:absolute;z-index:999">
+      <svg width="18" height="22" viewBox="0 0 18 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M2 2L2 18L6 14L9 20L11 19L8 13L14 13L2 2Z" fill="white" stroke="#333" stroke-width="1.2" stroke-linejoin="round"/>
+      </svg>
+    </div>
+
+    <!-- ══ SLIDE 2: Moving files ══ -->
+    <div class="stage" id="stage2">
+      <div class="stage-sizer">
+        <div class="sp-list-header"><div></div><div>Name</div><div>Modified</div><div>Modified By</div></div>
+        <div class="sp-file-row"><div class="file-icon">📄</div><div class="file-name">Organic Gardening Certificate</div><div class="file-modified">Yesterday</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📄</div><div class="file-name">Peat-free campaign update</div><div class="file-modified">2 days ago</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📄</div><div class="file-name">Rethink the British veg patch</div><div class="file-modified">Today</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📄</div><div class="file-name">Community garden newsletter</div><div class="file-modified">3 days ago</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📄</div><div class="file-name">Seed saving guide</div><div class="file-modified">4 days ago</div><div class="file-modified">Julia Dance</div></div>
+      </div>
+      <div class="sp-bg-filelist faded" id="s2bg">
+        <div class="sp-list-header"><div></div><div>Name</div><div>Modified</div><div>Modified By</div></div>
+        <div class="sp-file-row"><div class="file-icon">📄</div><div class="file-name">Organic Gardening Certificate</div><div class="file-modified">Yesterday</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row" id="s2-selrow"><div class="file-icon">📄</div><div class="file-name">Peat-free campaign update</div><div class="file-modified">2 days ago</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📄</div><div class="file-name">Rethink the British veg patch</div><div class="file-modified">Today</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📄</div><div class="file-name">Community garden newsletter</div><div class="file-modified">3 days ago</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📄</div><div class="file-name">Seed saving guide</div><div class="file-modified">4 days ago</div><div class="file-modified">Julia Dance</div></div>
+      </div>
+      <div class="anim-layer" id="anim2">
+        <div class="ctx-menu" id="s2ctx" style="left:190px;top:55px;">
+          <div class="dd-item" id="s2moveItem">→ Move to</div>
+          <div class="dd-item">✏ Rename</div>
+          <div class="dd-item">⎘ Copy to</div>
+          <div class="dd-item">🔗 Share</div>
+          <div class="dd-item">🗑 Delete</div>
+        </div>
+        <div class="move-dialog" id="s2dialog">
+          <div class="move-dialog-header">→ Move to</div>
+          <div class="move-folder-row">📁 Adopt a veg</div>
+          <div class="move-folder-row">📁 Advertising</div>
+          <div class="move-folder-row">📁 Blogs</div>
+          <div class="move-folder-row">📁 Booklets</div>
+          <div class="move-folder-row">📁 Brand</div>
+          <div class="move-dialog-footer">
+            <button class="move-btn">Cancel</button>
+            <button class="move-btn primary">Move here</button>
+          </div>
+        </div>
+        <div class="hl-ring" id="s2hl"></div>
+      </div>
+    </div>
+
+    <!-- ══ SLIDE 3: Naming files ══ -->
+    <div class="stage" id="stage3">
+      <div class="stage-sizer">
+        <div class="sp-list-header"><div></div><div>Name</div><div>Modified</div><div>Modified By</div></div>
+        <div class="sp-file-row"><div class="file-icon">📄</div><div class="file-name">Organic Gardening Certificate</div><div class="file-modified">Yesterday</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📄</div><div class="file-name">Peat-free campaign update</div><div class="file-modified">2 days ago</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📄</div><div class="file-name">Rethink the British veg patch</div><div class="file-modified">Today</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📄</div><div class="file-name">Untitled document</div><div class="file-modified">Just now</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📄</div><div class="file-name">Community garden newsletter</div><div class="file-modified">3 days ago</div><div class="file-modified">Julia Dance</div></div>
+      </div>
+      <!-- Word Online — real chrome -->
+      <div class="word-doc-wrap" id="s3-docview">
+        <div class="word-topbar">
+          <div class="word-w-icon">W</div>
+          <span class="word-filename" id="s3-doctitle">Untitled document</span>
+          <span class="word-autosave">● Autosaved</span>
+          <div class="word-topbar-right"><button class="word-share-btn">Share</button></div>
+        </div>
+        <div class="word-ribbon">
+          <span class="word-tab active">File</span>
+          <span class="word-tab">Home</span>
+          <span class="word-tab">Insert</span>
+          <span class="word-tab">Layout</span>
+          <span class="word-tab">Review</span>
+        </div>
+        <div class="word-doc-scroll">
+          <div class="word-page">
+            <h2>Organic Gardening Certificate</h2>
+            <p>"Get a job you love, and you'll never work a day in your life". This quote has stayed with me throughout my career, and it stands as true today as it was 40-plus years ago. The incredible subject of horticulture, and the happiness it has given me, is why I am so pleased to support Garden Organic with its new organic growing online certificate.</p>
+            <p>We want this course to help shore up your passion for sustainable gardening, whether as a career or a pastime.</p>
+            <p>The unique thing about gardening is it's the perfect blend of physical, practical skill and science. As an apprentice and a student, I remember my week being mapped out as four days on the tools and one day in the class...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- File list view (fades in after typing, for rename phase) -->
+      <div class="sp-bg-filelist faded" id="s3-filelist" style="opacity:0;z-index:5;transition:opacity .4s">
+        <div class="sp-list-header"><div></div><div>Name</div><div>Modified</div><div>Modified By</div></div>
+        <div class="sp-file-row"><div class="file-icon">📄</div><div class="file-name">Organic Gardening Certificate</div><div class="file-modified">Yesterday</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📄</div><div class="file-name">Peat-free campaign update</div><div class="file-modified">2 days ago</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📄</div><div class="file-name">Rethink the British veg patch</div><div class="file-modified">Today</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row" id="s3-untitledrow"><div class="file-icon">📄</div><div class="file-name" id="s3-untitledname">Untitled document</div><div class="file-modified">Just now</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📄</div><div class="file-name">Community garden newsletter</div><div class="file-modified">3 days ago</div><div class="file-modified">Julia Dance</div></div>
+      </div>
+
+      <!-- Callout pointing at title bar -->
+      <div class="callout arrow-up" id="s3-titlecallout" style="left:16px;top:48px;z-index:10">Name your file here — top left</div>
+
+      <!-- Animation layer for ctx menu + rename -->
+      <div class="anim-layer" id="anim3" style="z-index:10">
+        <div class="ctx-menu" id="s3ctx" style="left:200px;top:100px;">
+          <div class="dd-item">→ Move to</div>
+          <div class="dd-item hovered" id="s3renameItem">✏ Rename</div>
+          <div class="dd-item">⎘ Copy to</div>
+          <div class="dd-item">🗑 Delete</div>
+        </div>
+        <div class="rename-input-wrap" id="s3rename" style="left:52px;top:107px;">
+          <input type="text" id="s3renameInput" value="" readonly />
+          <span class="cursor-blink"></span>
+        </div>
+        <div class="hl-ring" id="s3hl"></div>
+      </div>
+    </div>
+
+    <!-- ══ SLIDE 4: Deleting files ══ -->
+    <div class="stage" id="stage4">
+      <div class="stage-sizer">
+        <div class="sp-list-header"><div></div><div>Name</div><div>Modified</div><div>Modified By</div></div>
+        <div class="sp-file-row"><div class="file-icon">📄</div><div class="file-name">Organic Gardening Certificate</div><div class="file-modified">Yesterday</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📄</div><div class="file-name">Peat-free campaign update</div><div class="file-modified">2 days ago</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📄</div><div class="file-name">Rethink the British veg patch</div><div class="file-modified">Today</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📄</div><div class="file-name">Community garden newsletter</div><div class="file-modified">3 days ago</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📄</div><div class="file-name">Seed saving guide</div><div class="file-modified">4 days ago</div><div class="file-modified">Julia Dance</div></div>
+      </div>
+      <div class="sp-bg-filelist faded" id="s4bg">
+        <div class="sp-list-header"><div></div><div>Name</div><div>Modified</div><div>Modified By</div></div>
+        <div class="sp-file-row"><div class="file-icon">📄</div><div class="file-name">Organic Gardening Certificate</div><div class="file-modified">Yesterday</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📄</div><div class="file-name">Peat-free campaign update</div><div class="file-modified">2 days ago</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row" id="s4-selrow"><div class="file-icon">📄</div><div class="file-name">Rethink the British veg patch</div><div class="file-modified">Today</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📄</div><div class="file-name">Community garden newsletter</div><div class="file-modified">3 days ago</div><div class="file-modified">Julia Dance</div></div>
+        <div class="sp-file-row"><div class="file-icon">📄</div><div class="file-name">Seed saving guide</div><div class="file-modified">4 days ago</div><div class="file-modified">Julia Dance</div></div>
+      </div>
+      <div class="anim-layer" id="anim4">
+        <div class="ctx-menu" id="s4ctx" style="left:190px;top:65px;">
+          <div class="dd-item" id="s4move">→ Move to</div>
+          <div class="dd-item" id="s4rename">✏ Rename</div>
+          <div class="dd-item" id="s4delete">🗑 Delete</div>
+          <div class="dd-item">🔗 Share</div>
+        </div>
+        <div class="sp-dropdown" id="s4createdd" style="left:16px;top:8px;">
+          <div class="dd-item">📄 Word document</div>
+          <div class="dd-item">📊 Excel workbook</div>
+          <div class="dd-item">📋 PowerPoint presentation</div>
+          <div class="dd-item" id="s4folder">📁 Folder</div>
+        </div>
+        <div class="hl-ring" id="s4hl"></div>
+        <div class="callout arrow-up" id="s4callout" style="left:16px;top:200px;">Use Create → Folder to make new folders too</div>
+      </div>
+    </div>
+
+    <!-- Narration -->
+    <div class="narration">
+      <div class="narration-icon" id="narIcon">📄</div>
+      <div class="narration-text">
+        <div class="narration-heading" id="narHeading">—</div>
+        <div class="narration-body" id="narBody">—</div>
+        <div class="tip-box" id="tipBox" style="display:none">
+          <span class="tip-icon">💡</span><span id="tipText"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="nav-row">
+    <button class="nav-btn" id="btnBack" onclick="changeSlide(-1)">← Back</button>
+    <span class="slide-counter" id="slideCounter"></span>
+    <div style="display:flex;gap:8px">
+      <button class="nav-btn" id="btnReplay" onclick="renderSlide(current)">↺ Replay</button>
+      <button class="nav-btn primary-nav" id="btnNext" onclick="changeSlide(1)">Next →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let timers=[];
+  function later(fn,ms){timers.push(setTimeout(fn,ms));}
+  function clearTimers(){timers.forEach(clearTimeout);timers=[];}
+  function el(id){return document.getElementById(id);}
+  function show(id){el(id)?.classList.add('show');}
+  function hide(id){el(id)?.classList.remove('show');}
+
+  function posHl(targetId,hlId,pad=5){
+    const t=el(targetId),h=el(hlId); if(!t||!h)return;
+    const stage=h.closest('.stage'); if(!stage)return;
+    const sr=stage.getBoundingClientRect(),tr=t.getBoundingClientRect();
+    Object.assign(h.style,{left:(tr.left-sr.left-pad)+'px',top:(tr.top-sr.top-pad)+'px',width:(tr.width+pad*2)+'px',height:(tr.height+pad*2)+'px'});
+  }
+  function posHlEl(targetEl,hlId,pad=5){
+    const h=el(hlId); if(!targetEl||!h)return;
+    const stage=h.closest('.stage'); if(!stage)return;
+    const sr=stage.getBoundingClientRect(),tr=targetEl.getBoundingClientRect();
+    Object.assign(h.style,{left:(tr.left-sr.left-pad)+'px',top:(tr.top-sr.top-pad)+'px',width:(tr.width+pad*2)+'px',height:(tr.height+pad*2)+'px'});
+  }
+
+  function pulseBtn(id){const b=el(id);if(!b)return;b.classList.add('active-btn');later(()=>b.classList.remove('active-btn'),700);}
+
+  function typeSpan(id,text,speed,cb){
+    const node=el(id);if(!node)return;node.textContent='';let i=0;
+    function step(){if(i<text.length){node.textContent+=text[i++];later(step,speed+Math.random()*20);}else if(cb)later(cb,200);}
+    later(step,100);
+  }
+  function typeInput(id,text,speed,cb){
+    const input=el(id);if(!input)return;input.value='';let i=0;
+    function step(){if(i<text.length){input.value+=text[i++];later(step,speed+Math.random()*20);}else if(cb)later(cb,200);}
+    later(step,100);
+  }
+
+  function showStage(n){document.querySelectorAll('.stage').forEach(s=>s.classList.remove('active'));el('stage'+n).classList.add('active');}
+
+  // ── SLIDE 1 ──────────────────────────────────────────────
+  function moveCursor(id, targetEl, cb){
+    const cursor = el(id);
+    const stage  = cursor.closest('.stage');
+    if(!cursor||!targetEl||!stage) return;
+    const sr = stage.getBoundingClientRect();
+    const tr = targetEl.getBoundingClientRect();
+    // centre of target
+    const tx = tr.left - sr.left + tr.width/2 - 9;
+    const ty = tr.top  - sr.top  + tr.height/2 - 4;
+    cursor.style.left = tx + 'px';
+    cursor.style.top  = ty + 'px';
+    show(id);
+    // after CSS transition completes (~420ms), fire callback
+    later(cb, 460);
+  }
+
+  function runSlide1(){
+    showStage(1);
+    el('spBreadcrumb').innerHTML='<span class="crumb">Documents</span><span class="sep"> › </span><span class="crumb">Server Migration</span><span class="sep"> › </span><span class="crumb active">Garden Organic All</span>';
+    el('s1-glass').style.opacity='0';
+
+    const cursor = el('s1cursor');
+    const container = document.querySelector('.screen-container');
+
+    function cursorTo(targetEl, cb){
+      const cr = container.getBoundingClientRect();
+      const tr = targetEl.getBoundingClientRect();
+      cursor.style.left = (tr.left - cr.left + tr.width/2 - 9) + 'px';
+      cursor.style.top  = (tr.top  - cr.top  + tr.height/2 - 4) + 'px';
+      show('s1cursor');
+      if(cb) later(cb, 460);
+    }
+
+    // Start cursor off at C&M row height, left edge
+    cursor.style.transition = 'none';
+    cursor.style.left = '40px';
+    cursor.style.top  = '180px';
+    cursor.style.opacity = '0';
+    later(()=>{ cursor.style.transition = 'opacity .2s, left .5s cubic-bezier(.4,0,.2,1), top .5s cubic-bezier(.4,0,.2,1)'; }, 50);
+
+    // 1. Move cursor to C&M row — starts after 2s pause
+    later(()=>{ cursorTo(el('s1-cmrow')); }, 2000);
+
+    // 2. Highlight row (simulate click)
+    later(()=>{ el('s1-cmrow').classList.add('selected'); }, 2600);
+
+    // 3. Slide in subfolder overlay + breadcrumb update
+    later(()=>{
+      el('s1-subfolder').classList.add('slide-in');
+      el('spBreadcrumb').innerHTML='<span class="crumb">Documents</span><span class="sep"> › </span><span class="crumb">Server Migration</span><span class="sep"> › </span><span class="crumb">Garden Organic All</span><span class="sep"> › </span><span class="crumb active">Communications and marketing</span>';
+      hide('s1cursor');
+    }, 3000);
+
+    // 4. Fade in glass
+    later(()=>{ el('s1-glass').style.opacity='1'; }, 3900);
+
+    // 5. Move cursor up to Create or upload button — rests there
+    later(()=>{ cursorTo(el('btnCreate')); }, 4200);
+
+    later(()=>{ show('s1callout'); }, 4800);
+
+    // 6. Done — no loop
+  }
+
+  // ── SLIDE 2 ──────────────────────────────────────────────
+  function runSlide2(){
+    showStage(2);
+    el('spBreadcrumb').innerHTML='<span class="crumb">Documents</span><span class="sep"> › </span><span class="crumb">Server Migration</span><span class="sep"> › </span><span class="crumb">Garden Organic All</span><span class="sep"> › </span><span class="crumb active">Communications and marketing</span>';
+
+    later(()=>{ el('s2-selrow').classList.add('selected'); },500);
+    later(()=>{ show('s2ctx'); },1200);
+    later(()=>{ el('s2moveItem').classList.add('hovered'); },1900);
+    later(()=>{
+      hide('s2ctx'); el('s2moveItem').classList.remove('hovered');
+      show('s2dialog');
+    },2600);
+    // cycle hover through each folder once, then stop
+    later(()=>{
+      const rows=[...el('s2dialog').querySelectorAll('.move-folder-row')];
+      let i=0;
+      function nextRow(){
+        rows.forEach(r=>r.classList.remove('hovered'));
+        if(i < rows.length){
+          rows[i].classList.add('hovered');
+          i++;
+          timers.push(setTimeout(nextRow, 900));
+        }
+        // i === rows.length → last row stays highlighted, done
+      }
+      nextRow();
+    },3300);
+  }
+
+  // ── SLIDE 3 ──────────────────────────────────────────────
+  function runSlide3(){
+    showStage(3);
+    el('spBreadcrumb').innerHTML='<span class="crumb">Documents</span><span class="sep"> › </span><span class="crumb">Server Migration</span><span class="sep"> › </span><span class="crumb">Garden Organic All</span><span class="sep"> › </span><span class="crumb active">Communications and marketing</span>';
+    el('s3-docview').style.opacity='1';
+    el('s3-filelist').style.opacity='0';
+    el('s3-filelist').style.zIndex='0';
+    el('s3-doctitle').textContent='Untitled document';
+    el('s3-untitledname').textContent='Untitled document';
+    el('s3-untitledrow').classList.remove('selected');
+    el('s3renameInput').value='';
+
+    // Show callout pointing at untitled title
+    later(()=>{ show('s3-titlecallout'); },700);
+
+    // Type the name into the title bar
+    later(()=>{
+      hide('s3-titlecallout');
+      typeSpan('s3-doctitle','Organic Gardening Certificate',65,()=>{
+
+        // Transition to file list
+        later(()=>{
+          el('s3-docview').style.opacity='0';
+          el('s3-filelist').style.opacity='1';
+          el('s3-filelist').style.zIndex='5';
+        },800);
+
+        // Highlight untitled row
+        later(()=>{ el('s3-untitledrow').classList.add('selected'); },1700);
+
+        // Context menu
+        later(()=>{ show('s3ctx'); },2400);
+        later(()=>{ el('s3renameItem').classList.add('hovered'); },3100);
+
+        // Rename input
+        later(()=>{
+          hide('s3ctx'); el('s3renameItem').classList.remove('hovered');
+          show('s3rename');
+          typeInput('s3renameInput','Organic Gardening Certificate',70,()=>{
+            later(()=>{
+              hide('s3rename');
+              el('s3-untitledname').textContent='Organic Gardening Certificate';
+              el('s3-untitledrow').classList.remove('selected');
+            },500);
+          });
+        },3800);
+      });
+    },1500);
+  }
+
+  // ── SLIDE 4 ──────────────────────────────────────────────
+  function runSlide4(){
+    showStage(4);
+    el('spBreadcrumb').innerHTML='<span class="crumb">Documents</span><span class="sep"> › </span><span class="crumb">Server Migration</span><span class="sep"> › </span><span class="crumb">Garden Organic All</span><span class="sep"> › </span><span class="crumb active">Communications and marketing</span>';
+
+    later(()=>{ el('s4-selrow').classList.add('selected'); },400);
+    later(()=>{ show('s4ctx'); },1000);
+    later(()=>{ el('s4move').classList.add('hovered'); },1600);
+    later(()=>{ el('s4move').classList.remove('hovered'); el('s4rename').classList.add('hovered'); },2300);
+    later(()=>{ el('s4rename').classList.remove('hovered'); el('s4delete').classList.add('hovered'); },3000);
+    later(()=>{
+      el('s4delete').classList.remove('hovered');
+      hide('s4ctx');
+      posHl('btnCreate','s4hl',5);
+      show('s4hl'); pulseBtn('btnCreate');
+    },3700);
+    later(()=>{ hide('s4hl'); show('s4createdd'); },4400);
+    later(()=>{ el('s4folder').classList.add('highlighted'); show('s4callout'); },5100);
+    later(()=>{ el('s4folder').classList.remove('highlighted'); hide('s4createdd'); },6100);
+  }
+
+  // ── Slide data ───────────────────────────────────────────
+  const slides=[
+    {id:1,icon:'📁',heading:'Creating files',
+     body:"When you go in you'll see the folders as you do now. Navigate to where you want to create your document, spreadsheet, presentation or other file and click Create.",
+     tip:"It's best to get into the habit of navigating to where you want to store the file before you start it — this is where it will live and will form part of its URL for sharing.",
+     onEnter:runSlide1},
+    {id:2,icon:'→',heading:'Moving files',
+     body:"If you forget to do that or create it in the wrong place, you can Move the file.",
+     tip:null,onEnter:runSlide2},
+    {id:3,icon:'✏',heading:'Naming files',
+     body:"SharePoint autosaves so remember to name your file. If you forget it saves as Untitled but you can rename it.",
+     tip:null,onEnter:runSlide3},
+    {id:4,icon:'🗑',heading:'Deleting files',
+     body:"From within the folders and files you can Move, Rename and Delete. You can do the same with Folders and can make new folders by clicking Create.",
+     tip:null,onEnter:runSlide4}
+  ];
+
+  let current=0;
+
+  function resetAll(){
+    clearTimers();
+    ['s1dropdown','s1callout','s2ctx','s2dialog','s3ctx','s3rename','s3-titlecallout',
+     's4ctx','s4createdd','s4callout'].forEach(hide);
+    ['s1hl','s2hl','s3hl','s4hl','s1cursor'].forEach(hide);
+    document.querySelectorAll('.dd-item,.move-folder-row,.sp-file-row').forEach(e=>{
+      e.classList.remove('hovered','highlighted','selected');
+    });
+    // slide 1
+    el('s1-subfolder').classList.remove('slide-in');
+    el('s1-glass').style.opacity='0';
+    // slide 3
+    el('s3-docview').style.opacity='1';
+    el('s3-filelist').style.opacity='0';
+    el('s3-filelist').style.zIndex='0';
+    el('s3-untitledname').textContent='Untitled document';
+    // breadcrumb
+    el('spBreadcrumb').innerHTML='<span class="crumb">Documents</span><span class="sep"> › </span><span class="crumb">Server Migration</span><span class="sep"> › </span><span class="crumb active">Garden Organic All</span>';
+    document.querySelectorAll('.sp-btn').forEach(b=>b.classList.remove('active-btn'));
+  }
+
+  function renderSlide(idx){
+    const s=slides[idx]; resetAll();
+    el('narIcon').textContent=s.icon;
+    el('narHeading').textContent=s.heading;
+    el('narBody').textContent=s.body;
+    const tb=el('tipBox'),tt=el('tipText');
+    if(s.tip){tt.textContent=s.tip;tb.style.display='flex';}else{tb.style.display='none';}
+    updateProgress();updateNav();s.onEnter();
+  }
+
+  function changeSlide(dir){const n=current+dir;if(n<0||n>=slides.length)return;current=n;renderSlide(current);}
+
+  function updateProgress(){
+    const track=el('progressTrack');track.innerHTML='';
+    slides.forEach((s,i)=>{
+      const d=document.createElement('div');
+      d.className='progress-dot'+(i===current?' active':i<current?' done':'');
+      d.onclick=()=>{current=i;renderSlide(i);};
+      track.appendChild(d);
+    });
+    el('slideCounter').textContent=`${current+1} / ${slides.length}`;
+  }
+
+  function updateNav(){
+    el('btnBack').disabled=current===0;
+    const b=el('btnNext');
+    if(current===slides.length-1){b.textContent='↩ Restart';b.onclick=()=>{current=0;renderSlide(0);};}
+    else{b.textContent='Next →';b.onclick=()=>changeSlide(1);}
+  }
+
+  renderSlide(0);
+</script>
+</body>
+</html>

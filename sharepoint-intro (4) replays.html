@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SharePoint File Storage</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700&display=swap');
+  :root {
+    --ms-blue:#0078d4;--ms-blue-dark:#005a9e;--ms-blue-light:#deecf9;
+    --ms-green:#107c10;--ms-gray:#f3f2f1;--ms-gray-mid:#edebe9;
+    --ms-text:#323130;--ms-text-light:#605e5c;--ms-border:#d2d0ce;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:#1a1a2e;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+  .wrapper{width:100%;max-width:860px}
+  h1.title{font-family:'Nunito',sans-serif;color:#fff;font-size:1.1rem;font-weight:300;letter-spacing:3px;text-transform:uppercase;text-align:center;margin-bottom:18px;opacity:.7}
+  .progress-track{display:flex;gap:8px;margin-bottom:16px;justify-content:center}
+  .progress-dot{width:28px;height:4px;border-radius:2px;background:rgba(255,255,255,.15);transition:background .4s;cursor:pointer}
+  .progress-dot.active{background:var(--ms-blue)}.progress-dot.done{background:rgba(255,255,255,.4)}
+  .screen-container{background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.5);position:relative}
+  .sp-header{background:var(--ms-blue);padding:0 16px;height:48px;display:flex;align-items:center;gap:12px}
+  .sp-logo{display:flex;align-items:center;gap:6px;color:white;font-size:.95rem;font-weight:600}
+  .sp-breadcrumb{color:rgba(255,255,255,.8);font-size:.8rem;margin-left:auto}
+  .sp-toolbar{background:#fff;border-bottom:1px solid var(--ms-border);padding:6px 16px;display:flex;align-items:center;gap:4px}
+  .sp-btn{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border:1px solid transparent;border-radius:3px;font-size:.78rem;cursor:pointer;background:transparent;color:var(--ms-text);white-space:nowrap}
+  .sp-btn.primary{background:var(--ms-blue);color:white;border-color:var(--ms-blue);font-weight:600}
+  .sp-btn .icon{font-size:1rem;line-height:1}
+  .sp-divider{width:1px;height:22px;background:var(--ms-border);margin:0 4px}
+  .sp-list-header{display:grid;grid-template-columns:32px 1fr 140px 120px;padding:8px 16px;border-bottom:1px solid var(--ms-border);font-size:.72rem;color:var(--ms-text-light);font-weight:600;text-transform:uppercase;letter-spacing:.5px;background:var(--ms-gray)}
+  .sp-file-row{display:grid;grid-template-columns:32px 1fr 140px 120px;padding:7px 16px;border-bottom:1px solid var(--ms-gray-mid);align-items:center;font-size:.82rem;cursor:pointer}
+  .file-icon{font-size:1.1rem}.file-name{color:var(--ms-blue)}.file-modified{color:var(--ms-text-light);font-size:.75rem}.file-size{color:var(--ms-text-light);font-size:.75rem}
+
+  /* Stage base */
+  .stage{display:none;position:relative;min-height:240px;overflow:hidden;background:#fff}
+  .stage.active{display:block}
+
+  /* Shared folder background — used on ALL slides */
+  .sp-bg-filelist{position:absolute;inset:0;pointer-events:none}
+  /* Slides 1+2 slightly more visible; 3-6 more faded */
+  .sp-bg-filelist.prominent{opacity:.7}
+  .sp-bg-filelist.faded{opacity:.7}
+
+  /* Centre overlay card */
+  .centre-card{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 32px;text-align:center;gap:10px}
+  .centre-card .big-icon{font-size:2.6rem;margin-bottom:4px;animation:popIn .5s cubic-bezier(.34,1.56,.64,1) both}
+  .centre-card h2{font-family:'Nunito',sans-serif;font-size:1.25rem;font-weight:700;color:var(--ms-blue);animation:fadeUp .5s .1s ease both;background:rgba(255,255,255,.82);padding:5px 18px;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,.08)}
+
+  /* Slide 2 pills */
+  .word-anim-row{display:flex;gap:14px;align-items:center;margin:10px 0 4px}
+  .word-pill{font-family:'Nunito',sans-serif;font-size:1.15rem;font-weight:700;padding:6px 18px;border-radius:30px;opacity:0;transform:scale(.7) translateY(10px);transition:opacity .5s,transform .5s;box-shadow:0 4px 14px rgba(0,0,0,.15)}
+  .word-pill.create{background:var(--ms-blue);color:white}
+  .word-pill.and{background:transparent;color:var(--ms-text);font-size:.9rem;box-shadow:none}
+  .word-pill.share{background:var(--ms-green);color:white}
+  .word-pill.show{opacity:1;transform:scale(1) translateY(0)}
+  .slide2-sub{font-size:.78rem;color:var(--ms-text);font-weight:600;background:rgba(255,255,255,.78);padding:3px 14px;border-radius:6px;opacity:0;animation:fadeUp .5s 1.4s ease both}
+  .slide2-intro{font-size:.82rem;color:var(--ms-text);font-weight:600;background:rgba(255,255,255,.78);padding:4px 14px;border-radius:6px;margin-bottom:2px;animation:fadeUp .4s .1s ease both}
+
+  /* Slides 3+4 flow — content sits ON TOP of faded bg */
+  .flow-outer{position:relative;min-height:240px;z-index:2}
+  .flow-stage{min-height:240px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px 24px;background:rgba(255,255,255,.6)}
+  .flow-label{font-family:'Nunito',sans-serif;font-size:.7rem;text-transform:uppercase;letter-spacing:2px;font-weight:700;margin-bottom:18px}
+  .flow-label.fdrive{color:#8c6b00}.flow-label.sp{color:var(--ms-blue)}
+  .flow-steps{display:flex;align-items:flex-start;gap:0}
+  .flow-step{display:flex;flex-direction:column;align-items:center;gap:6px;opacity:0;transform:translateY(16px);transition:opacity .45s,transform .45s;min-width:120px}
+  .flow-step.show{opacity:1;transform:translateY(0)}
+  .step-icon-wrap{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.7rem;box-shadow:0 4px 14px rgba(0,0,0,.1)}
+  .step-icon-wrap.fdrive{background:#fff4ce;border:2px solid #f9c12e}
+  .step-icon-wrap.fdrive-r{background:#fde7e9;border:2px solid #f4c0c4}
+  .step-icon-wrap.sp-green{background:#dff6dd;border:2px solid #55c153}
+  .step-icon-wrap.sp-blue{background:var(--ms-blue-light);border:2px solid var(--ms-blue)}
+  .step-label{font-size:.78rem;font-weight:600;color:var(--ms-text);text-align:center;max-width:100px}
+  .step-sub{font-size:.68rem;color:var(--ms-text-light);text-align:center;max-width:100px;line-height:1.3}
+  .flow-arrow{font-size:1.6rem;color:#bbb;margin:0 2px;opacity:0;transition:opacity .3s;align-self:flex-start;margin-top:20px}
+  .flow-arrow.show{opacity:1}
+  .autosave-badge{position:absolute;background:#dff6dd;border:1.5px solid #55c153;color:#0b5f0b;font-size:.63rem;font-weight:700;padding:2px 7px;border-radius:10px;top:-10px;right:-18px;white-space:nowrap;opacity:0;transition:opacity .4s}
+
+  /* Slide 5 */
+  .smart-outer{position:relative;min-height:240px}
+  .smart-grid{position:relative;z-index:2;min-height:240px;display:flex;align-items:center;justify-content:center;gap:28px;padding:24px 32px;background:rgba(243,242,241,.6)}
+  .smart-box{background:white;border-radius:10px;border:2px solid var(--ms-border);padding:16px;text-align:center;width:190px;opacity:0;transform:translateY(12px);transition:opacity .5s,transform .5s}
+  .smart-box.show{opacity:1;transform:translateY(0)}
+  .smart-box.bad{border-color:#f4c0c4;background:#fff5f5}.smart-box.good{border-color:#a7d9a4;background:#f5fff4}
+  .smart-box .box-icon{font-size:2rem;margin-bottom:6px}
+  .smart-box h4{font-size:.78rem;font-weight:700;color:var(--ms-text);margin-bottom:4px}
+  .smart-box p{font-size:.68rem;color:var(--ms-text-light);line-height:1.4}
+  .smart-vs{font-family:'Nunito',sans-serif;font-size:1.4rem;font-weight:700;color:var(--ms-text-light);opacity:0;transition:opacity .4s .5s}
+  .smart-vs.show{opacity:1}
+
+  /* Slide 6 */
+  .safety-outer{position:relative;min-height:240px}
+  .safety-stage{position:relative;z-index:2;min-height:240px;display:flex;gap:16px;padding:16px 18px;background:rgba(255,255,255,.6);align-items:flex-start;justify-content:center}
+  .safety-panel{background:white;border:1px solid var(--ms-border);border-radius:8px;overflow:hidden;width:48%;box-shadow:0 2px 12px rgba(0,0,0,.07);opacity:0;transform:translateY(14px);transition:opacity .5s,transform .5s}
+  .safety-panel.show{opacity:1;transform:translateY(0)}
+  .safety-panel-header{background:var(--ms-blue);color:white;font-size:.72rem;font-weight:700;padding:7px 12px;display:flex;align-items:center;gap:6px;text-transform:uppercase;letter-spacing:.5px}
+  .version-row{display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid var(--ms-gray-mid);font-size:.73rem;opacity:0;transform:translateX(-8px);transition:opacity .4s,transform .4s}
+  .version-row.show{opacity:1;transform:translateX(0)}
+  .ver-dot{width:8px;height:8px;border-radius:50%;background:var(--ms-blue);flex-shrink:0}
+  .ver-dot.current{background:var(--ms-green)}
+  .ver-name{font-weight:600;color:var(--ms-text);flex:1}.ver-date{color:var(--ms-text-light);font-size:.67rem}
+  .ver-badge{background:#dff6dd;color:#0b5f0b;font-size:.6rem;font-weight:700;padding:1px 6px;border-radius:8px}
+  .sharing-row{display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid var(--ms-gray-mid);font-size:.73rem;opacity:0;transform:translateX(8px);transition:opacity .4s,transform .4s}
+  .sharing-row.show{opacity:1;transform:translateX(0)}
+  .avatar{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;color:white;flex-shrink:0}
+  .share-name{flex:1;font-weight:600;color:var(--ms-text)}
+  .share-badge{font-size:.62rem;font-weight:700;padding:2px 7px;border-radius:8px}
+  .share-badge.view{background:var(--ms-blue-light);color:var(--ms-blue)}
+  .share-badge.edit{background:#fff4ce;color:#8c6b00}
+  .share-badge.owner{background:#dff6dd;color:#0b5f0b}
+  .lock-row{display:flex;align-items:center;gap:8px;padding:7px 12px;font-size:.7rem;color:var(--ms-text-light);opacity:0;transition:opacity .5s}
+  .lock-row.show{opacity:1}
+
+  /* Narration */
+  .narration{background:linear-gradient(135deg,#0f1b35,#1a2a4a);border-top:3px solid var(--ms-blue);padding:16px 20px;display:flex;align-items:flex-start;gap:14px}
+  .narration-icon{width:36px;height:36px;background:var(--ms-blue);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;margin-top:2px}
+  .narration-text{color:#fff;flex:1}
+  .narration-heading{font-family:'Nunito',sans-serif;font-size:.95rem;font-weight:700;color:#93c5fd;margin-bottom:4px}
+  .narration-body{font-size:.82rem;color:rgba(255,255,255,.85);line-height:1.6}
+  .nav-row{display:flex;justify-content:space-between;align-items:center;margin-top:14px}
+  .nav-btn{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:white;padding:8px 20px;border-radius:5px;font-size:.82rem;cursor:pointer;font-family:'Nunito',sans-serif;font-weight:600;transition:all .2s}
+  .nav-btn:hover{background:rgba(255,255,255,.15)}.nav-btn:disabled{opacity:.3;cursor:default;pointer-events:none}
+  .nav-btn.primary-nav{background:var(--ms-blue);border-color:var(--ms-blue)}
+  .slide-counter{color:rgba(255,255,255,.4);font-size:.75rem;font-family:'Nunito',sans-serif}
+
+  @keyframes popIn{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:scale(1)}}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+  /* ── Mobile ── */
+  @media (max-width: 600px) {
+    body{padding:12px}
+    h1.title{font-size:.75rem;letter-spacing:2px;margin-bottom:12px}
+    .progress-dot{width:20px}
+
+    /* Header */
+    .sp-breadcrumb{display:none}
+
+    /* Toolbar — show only New + Upload on mobile */
+    .sp-toolbar{padding:5px 10px;gap:4px;overflow:hidden}
+    .sp-btn{font-size:.72rem;padding:4px 8px}
+    .sp-btn:nth-child(n+3){display:none} /* hide Rename, Move, divider */
+
+    /* Folder list — drop Modified & File size columns */
+    .sp-list-header{grid-template-columns:28px 1fr;padding:6px 10px}
+    .sp-list-header div:nth-child(3),
+    .sp-list-header div:nth-child(4){display:none}
+    .sp-file-row{grid-template-columns:28px 1fr;padding:6px 10px;font-size:.78rem}
+    .file-modified,.file-size{display:none}
+    .file-icon{font-size:1rem}
+
+    /* Stage min-height smaller */
+    .stage{min-height:200px}
+
+    /* Centre card */
+    .centre-card{padding:16px}
+    .centre-card .big-icon{font-size:2rem}
+    .centre-card h2{font-size:1rem;padding:4px 12px}
+    .slide2-intro{font-size:.75rem}
+    .word-pill{font-size:.95rem;padding:5px 14px}
+    .slide2-sub{font-size:.72rem}
+
+    /* Flow diagrams */
+    .flow-stage{padding:14px 10px;min-height:200px}
+    .flow-steps{gap:0;justify-content:center}
+    .flow-step{min-width:80px}
+    .step-icon-wrap{width:48px;height:48px;font-size:1.3rem}
+    .step-label{font-size:.68rem;max-width:75px}
+    .step-sub{font-size:.6rem;max-width:75px}
+    .flow-arrow{font-size:1.1rem;margin-top:14px}
+    .autosave-badge{font-size:.56rem;right:-12px;top:-8px}
+    .flow-label{font-size:.62rem;margin-bottom:12px}
+
+    /* Slide 5 */
+    .smart-grid{padding:16px 12px;gap:12px;flex-direction:column;align-items:center;min-height:200px}
+    .smart-box{width:85%;padding:12px}
+    .smart-vs{transform:rotate(90deg)}
+
+    /* Slide 6 */
+    .safety-stage{flex-direction:column;padding:12px 10px;gap:10px;min-height:200px}
+    .safety-panel{width:100%}
+    .version-row,.sharing-row{padding:5px 10px;font-size:.68rem}
+    .ver-date{display:none}
+    .lock-row{padding:5px 10px;font-size:.65rem}
+
+    /* Narration */
+    .narration{padding:12px 14px;gap:10px}
+    .narration-icon{width:30px;height:30px;font-size:.85rem;flex-shrink:0}
+    .narration-heading{font-size:.85rem}
+    .narration-body{font-size:.75rem}
+
+    /* Nav */
+    .nav-btn{padding:7px 14px;font-size:.75rem}
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <h1 class="title">SharePoint File Storage</h1>
+  <div class="progress-track" id="progressTrack"></div>
+  <div class="screen-container">
+
+    <div class="sp-header">
+      <div class="sp-logo">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <rect x="2" y="2" width="9" height="9" rx="1" fill="white" opacity=".9"/>
+          <rect x="13" y="2" width="9" height="9" rx="1" fill="white" opacity=".6"/>
+          <rect x="2" y="13" width="9" height="9" rx="1" fill="white" opacity=".6"/>
+          <rect x="13" y="13" width="9" height="9" rx="1" fill="white" opacity=".3"/>
+        </svg>
+        SharePoint
+      </div>
+      <div class="sp-breadcrumb">Organisation Docs</div>
+    </div>
+    <div class="sp-toolbar" id="spToolbar">
+      <button class="sp-btn primary"><span class="icon">＋</span> New</button>
+      <button class="sp-btn"><span class="icon">↑</span> Upload</button>
+      <div class="sp-divider"></div>
+      <button class="sp-btn"><span class="icon">✏</span> Rename</button>
+      <button class="sp-btn"><span class="icon">→</span> Move to</button>
+      <button class="sp-btn"><span class="icon">⎘</span> Copy to</button>
+    </div>
+
+    <!-- reusable folder list snippet (injected by JS into each slide) -->
+    <template id="folderListTpl">
+      <div class="sp-list-header"><div></div><div>Name</div><div>Modified</div><div>File size</div></div>
+      <div class="sp-file-row"><div class="file-icon">📁</div><div class="file-name">Accounts</div><div class="file-modified">Yesterday</div><div class="file-size">—</div></div>
+      <div class="sp-file-row"><div class="file-icon">📁</div><div class="file-name">Associates</div><div class="file-modified">2 days ago</div><div class="file-size">—</div></div>
+      <div class="sp-file-row"><div class="file-icon">📁</div><div class="file-name">Communications and Marketing</div><div class="file-modified">Today</div><div class="file-size">—</div></div>
+      <div class="sp-file-row"><div class="file-icon">📁</div><div class="file-name">CRM</div><div class="file-modified">3 days ago</div><div class="file-size">—</div></div>
+      <div class="sp-file-row"><div class="file-icon">📁</div><div class="file-name">Education</div><div class="file-modified">4 days ago</div><div class="file-size">—</div></div>
+      <div class="sp-file-row"><div class="file-icon">📁</div><div class="file-name">Fundraising</div><div class="file-modified">5 Jan</div><div class="file-size">—</div></div>
+    </template>
+
+    <!-- SLIDE 1 -->
+    <div class="stage" id="stage1">
+      <div class="sp-bg-filelist prominent" id="bg1"></div>
+      <div class="centre-card">
+        <div class="big-icon">📂</div>
+        <h2>Same structure. New home.</h2>
+      </div>
+    </div>
+
+    <!-- SLIDE 2 -->
+    <div class="stage" id="stage2">
+      <div class="sp-bg-filelist prominent" id="bg2"></div>
+      <div class="centre-card">
+        <p class="slide2-intro">The key change is how you work with files:</p>
+        <div class="word-anim-row">
+          <div class="word-pill create" id="pillCreate">Create</div>
+          <div class="word-pill and" id="pillAnd">&amp;</div>
+          <div class="word-pill share" id="pillShare">Share</div>
+        </div>
+        <p class="slide2-sub">rather than save &amp; send</p>
+      </div>
+    </div>
+
+    <!-- SLIDE 3 -->
+    <div class="stage" id="stage3">
+      <div class="sp-bg-filelist prominent" id="bg3"></div>
+      <div class="flow-outer">
+        <div class="flow-stage">
+          <div class="flow-label fdrive">📁 In the F drive</div>
+          <div class="flow-steps">
+            <div class="flow-step" id="f1"><div class="step-icon-wrap fdrive">📝</div><div class="step-label">Make a document</div></div>
+            <div class="flow-arrow" id="fa1">›</div>
+            <div class="flow-step" id="f2"><div class="step-icon-wrap fdrive">💾</div><div class="step-label">Save it</div><div class="step-sub">to the F drive</div></div>
+            <div class="flow-arrow" id="fa2">›</div>
+            <div class="flow-step" id="f3"><div class="step-icon-wrap fdrive-r">📧</div><div class="step-label">Email it</div><div class="step-sub">as an attachment</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 4 -->
+    <div class="stage" id="stage4">
+      <div class="sp-bg-filelist prominent" id="bg4"></div>
+      <div class="flow-outer">
+        <div class="flow-stage">
+          <div class="flow-label sp">☁ In SharePoint</div>
+          <div class="flow-steps">
+            <div class="flow-step" id="s1s"><div class="step-icon-wrap sp-blue">📝</div><div class="step-label">Make a document</div></div>
+            <div class="flow-arrow" id="sa1">›</div>
+            <div class="flow-step" id="s2s">
+              <div style="position:relative"><div class="step-icon-wrap sp-green">☁</div><div class="autosave-badge" id="autosaveBadge">✓ Autosaved</div></div>
+              <div class="step-label">It autosaves</div><div class="step-sub">no action needed</div>
+            </div>
+            <div class="flow-arrow" id="sa2">›</div>
+            <div class="flow-step" id="s3s"><div class="step-icon-wrap sp-green">🔗</div><div class="step-label">Share its location</div><div class="step-sub">one file, one link</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 5 -->
+    <div class="stage" id="stage5">
+      <div class="sp-bg-filelist prominent" id="bg5"></div>
+      <div class="smart-outer">
+        <div class="smart-grid">
+          <div class="smart-box bad" id="smartBad">
+            <div class="box-icon">📨</div>
+            <h4>Before</h4>
+            <p>Multiple email attachments → duplicate files → version confusion</p>
+          </div>
+          <div class="smart-vs" id="smartVs">→</div>
+          <div class="smart-box good" id="smartGood">
+            <div class="box-icon">✅</div>
+            <h4>With SharePoint</h4>
+            <p>No duplicates or multiple versions</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 6 -->
+    <div class="stage" id="stage6">
+      <div class="sp-bg-filelist prominent" id="bg6"></div>
+      <div class="safety-outer">
+        <div class="safety-stage">
+          <div class="safety-panel" id="verPanel">
+            <div class="safety-panel-header">🕓 Version History</div>
+            <div class="version-row" id="vr1"><div class="ver-dot current"></div><div class="ver-name">v4 — Current</div><div class="ver-date">Today 14:32</div><div class="ver-badge">Latest</div></div>
+            <div class="version-row" id="vr2"><div class="ver-dot"></div><div class="ver-name">v3</div><div class="ver-date">Yesterday 11:05</div></div>
+            <div class="version-row" id="vr3"><div class="ver-dot"></div><div class="ver-name">v2</div><div class="ver-date">Mon 09:14</div></div>
+            <div class="version-row" id="vr4"><div class="ver-dot"></div><div class="ver-name">v1 — Original</div><div class="ver-date">12 Jan 09:00</div></div>
+          </div>
+          <div class="safety-panel" id="sharePanel" style="transition-delay:.2s">
+            <div class="safety-panel-header">🔒 Sharing Settings</div>
+            <div class="sharing-row" id="sr1"><div class="avatar" style="background:#0078d4">JT</div><div class="share-name">Jane T.</div><div class="share-badge owner">Owner</div></div>
+            <div class="sharing-row" id="sr2" style="transition-delay:.15s"><div class="avatar" style="background:#107c10">AM</div><div class="share-name">Alex M.</div><div class="share-badge edit">Can edit</div></div>
+            <div class="sharing-row" id="sr3" style="transition-delay:.3s"><div class="avatar" style="background:#8764b8">PR</div><div class="share-name">Pat R.</div><div class="share-badge view">View only</div></div>
+            <div class="lock-row" id="sr4" style="transition-delay:.45s">🔒 Only shared people can access</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="narration">
+      <div class="narration-icon" id="narIcon">ℹ</div>
+      <div class="narration-text">
+        <div class="narration-heading" id="narHeading">—</div>
+        <div class="narration-body" id="narBody">—</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="nav-row">
+    <button class="nav-btn" id="btnBack" onclick="changeSlide(-1)">← Back</button>
+    <span class="slide-counter" id="slideCounter"></span>
+    <div style="display:flex;gap:8px">
+      <button class="nav-btn" id="btnReplay" onclick="renderSlide(current)">↺ Replay</button>
+      <button class="nav-btn primary-nav" id="btnNext" onclick="changeSlide(1)">Next →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Inject folder list into every background div
+  const tpl = document.getElementById('folderListTpl');
+  ['bg1','bg2','bg3','bg4','bg5','bg6'].forEach(id => {
+    document.getElementById(id).appendChild(tpl.content.cloneNode(true));
+  });
+
+  const slides = [
+    {
+      id:1, icon:'📂',
+      heading:"What's the same?",
+      body:"SharePoint file storage looks similar to the F drive and you'll see the same folders and files you see now.",
+      showToolbar:true,
+      onEnter(){showStage(1)}
+    },
+    {
+      id:2, icon:'🔄',
+      heading:"What's different?",
+      body:"The key change is you will create and share files rather than save and send them.",
+      showToolbar:true,
+      onEnter(){
+        showStage(2);
+        setTimeout(()=>pill('pillCreate',1),400);
+        setTimeout(()=>pill('pillAnd',1),700);
+        setTimeout(()=>pill('pillShare',1),1000);
+      }
+    },
+    {
+      id:3, icon:'📁',
+      heading:"In the F drive",
+      body:"You make a document → you save it → you email it as an attachment.",
+      showToolbar:false,
+      onEnter(){showStage(3);stagger(['f1','fa1','f2','fa2','f3'],350)}
+    },
+    {
+      id:4, icon:'☁',
+      heading:"In SharePoint",
+      body:"You make a document → it autosaves → you share its location.",
+      showToolbar:false,
+      onEnter(){
+        showStage(4);
+        stagger(['s1s','sa1','s2s','sa2','s3s'],350);
+        setTimeout(()=>{ document.getElementById('autosaveBadge').style.opacity='1'; },1200);
+      }
+    },
+    {
+      id:5, icon:'📊',
+      heading:"Smarter file storage",
+      body:"This reduces multiple versions and duplicate files being created or saved in multiple locations.",
+      showToolbar:false,
+      onEnter(){
+        showStage(5);
+        setTimeout(()=>show('smartBad'),300);
+        setTimeout(()=>show('smartVs'),650);
+        setTimeout(()=>show('smartGood'),850);
+      }
+    },
+    {
+      id:6, icon:'🔒',
+      heading:"Safer file storage",
+      body:"You can still access version history so nothing is lost, and permissions and sharing settings ensure the security of your documents and data.",
+      showToolbar:false,
+      onEnter(){
+        showStage(6);
+        setTimeout(()=>show('verPanel'),300);
+        setTimeout(()=>show('sharePanel'),500);
+        ['vr1','vr2','vr3','vr4'].forEach((id,i)=>setTimeout(()=>show(id),600+i*180));
+        ['sr1','sr2','sr3','sr4'].forEach((id,i)=>setTimeout(()=>show(id),700+i*200));
+      }
+    }
+  ];
+
+  let current = 0;
+
+  function showStage(n){
+    document.querySelectorAll('.stage').forEach(s=>s.classList.remove('active'));
+    document.getElementById('stage'+n).classList.add('active');
+  }
+  function show(id){document.getElementById(id)?.classList.add('show')}
+  function pill(id,on){document.getElementById(id)?.classList.toggle('show',!!on)}
+  function stagger(ids,d){ids.forEach((id,i)=>setTimeout(()=>show(id),i*d))}
+
+  function resetAll(){
+    ['pillCreate','pillAnd','pillShare'].forEach(id=>pill(id,0));
+    ['f1','fa1','f2','fa2','f3','s1s','sa1','s2s','sa2','s3s'].forEach(id=>document.getElementById(id)?.classList.remove('show'));
+    const b=document.getElementById('autosaveBadge');if(b)b.style.opacity='0';
+    ['smartBad','smartVs','smartGood','verPanel','sharePanel',
+     'vr1','vr2','vr3','vr4','sr1','sr2','sr3','sr4'].forEach(id=>document.getElementById(id)?.classList.remove('show'));
+  }
+
+  function renderSlide(idx){
+    const s=slides[idx]; resetAll();
+    document.getElementById('narIcon').textContent   = s.icon;
+    document.getElementById('narHeading').textContent= s.heading;
+    document.getElementById('narBody').textContent   = s.body;
+    document.getElementById('spToolbar').style.display = s.showToolbar ? '' : 'none';
+    updateProgress(); updateNav(); s.onEnter();
+  }
+
+  function changeSlide(dir){
+    const n=current+dir;
+    if(n<0||n>=slides.length)return;
+    current=n; renderSlide(current);
+  }
+
+  function updateProgress(){
+    const t=document.getElementById('progressTrack'); t.innerHTML='';
+    slides.forEach((s,i)=>{
+      const d=document.createElement('div');
+      d.className='progress-dot'+(i===current?' active':i<current?' done':'');
+      d.onclick=()=>{current=i;renderSlide(i)};
+      t.appendChild(d);
+    });
+    document.getElementById('slideCounter').textContent=`${current+1} / ${slides.length}`;
+  }
+
+  function updateNav(){
+    document.getElementById('btnBack').disabled=current===0;
+    const b=document.getElementById('btnNext');
+    if(current===slides.length-1){
+      b.textContent='↩ Restart';
+      b.onclick=()=>{current=0;renderSlide(0)};
+    } else {
+      b.textContent='Next →';
+      b.onclick=()=>changeSlide(1);
+    }
+  }
+
+  renderSlide(0);
+</script>
+</body>
+</html>
